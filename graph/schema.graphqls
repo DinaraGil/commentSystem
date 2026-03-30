@@ -1,0 +1,53 @@
+type User {
+  id: ID!
+  username: String!
+}
+
+type Post {
+  id: ID!
+  user: User!
+  content: String!
+  allowComment: Boolean!
+  createdAt: String!
+}
+
+type Comment {
+    id: ID!
+    replyComment: Comment
+    post: Post
+    user: User!
+    content: String!
+    createdAt: String!
+}
+
+input NewUser {
+    username: String!
+}
+
+input NewPost {
+    userId: ID!
+    content: String!
+    allowComment: Boolean = true
+    createdAt: String!
+}
+
+input NewComment {
+    replyCommentId: ID
+    postId: ID
+    userId: ID!
+    content: String!
+    createdAt: String!
+}
+
+type Mutation {
+  createUser(input: NewUser!): User!
+
+  createPost(input: NewPost!): Post!
+
+  createComment(input: NewComment!): Comment!
+}
+
+type Query {
+    posts: [Post!]!
+    post(id: ID!): Post
+}
