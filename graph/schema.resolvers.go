@@ -9,6 +9,7 @@ import (
 	"commentSystem/graph/model"
 	"commentSystem/internal/models"
 	"context"
+	"fmt"
 )
 
 // CreatedAt is the resolver for the createdAt field.
@@ -57,9 +58,13 @@ func (r *mutationResolver) CreateComment(ctx context.Context, input model.NewCom
 		return nil, err
 	}
 
-	_, err = r.GetPostByID(ctx, input.PostID)
+	post, err := r.GetPostByID(ctx, input.PostID)
 	if err != nil {
 		return nil, err
+	}
+
+	if !(*post.AllowComment) {
+		return nil, fmt.Errorf("the user with id %d has disabled comments", input.UserID)
 	}
 
 	var comment models.Comment
