@@ -16,7 +16,7 @@ import (
 func (r *mutationResolver) CreateUser(ctx context.Context, input model.NewUser) (*models.User, error) {
 	var user models.User
 
-	query := `INSERT INTO user (username) VALUES ($1) returning user_id, username;`
+	query := `INSERT INTO person (username) VALUES ($1) returning person_id, username;`
 
 	err := r.DB.QueryRowxContext(ctx, query, input.Username).StructScan(&user)
 
@@ -28,7 +28,16 @@ func (r *mutationResolver) CreateUser(ctx context.Context, input model.NewUser) 
 
 // CreatePost is the resolver for the createPost field.
 func (r *mutationResolver) CreatePost(ctx context.Context, input model.NewPost) (*model.Post, error) {
-	panic(fmt.Errorf("not implemented: CreatePost - createPost"))
+	var user models.User
+
+	query := `INSERT INTO person (username) VALUES ($1) returning person_id, username;`
+
+	err := r.DB.QueryRowxContext(ctx, query, input.Username).StructScan(&user)
+
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 // CreateComment is the resolver for the createComment field.
