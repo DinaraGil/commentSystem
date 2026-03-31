@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS post (
 CREATE TABLE IF NOT EXISTS comment (
     comment_id SERIAL PRIMARY KEY,
     reply_comment_id INTEGER,
+    comment_level INTEGER,
     post_id INTEGER NOT NULL,
     person_id INTEGER,
     content VARCHAR(2000) NOT NULL,

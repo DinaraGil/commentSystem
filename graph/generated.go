@@ -33,6 +33,7 @@ type ResolverRoot interface {
 	Mutation() MutationResolver
 	Post() PostResolver
 	Query() QueryResolver
+	Subscription() SubscriptionResolver
 }
 
 type DirectiveRoot struct {
@@ -43,6 +44,7 @@ type ComplexityRoot struct {
 		Content        func(childComplexity int) int
 		CreatedAt      func(childComplexity int) int
 		ID             func(childComplexity int) int
+		Level          func(childComplexity int) int
 		PostID         func(childComplexity int) int
 		Replies        func(childComplexity int) int
 		ReplyCommentID func(childComplexity int) int
@@ -69,6 +71,10 @@ type ComplexityRoot struct {
 		Posts func(childComplexity int) int
 	}
 
+	Subscription struct {
+		CommentPublished func(childComplexity int, postID int) int
+	}
+
 	User struct {
 		ID       func(childComplexity int) int
 		UserName func(childComplexity int) int
@@ -76,6 +82,7 @@ type ComplexityRoot struct {
 }
 
 type CommentResolver interface {
+	Level(ctx context.Context, obj *models.Comment) (int32, error)
 	CreatedAt(ctx context.Context, obj *models.Comment) (*models.Timestamp, error)
 }
 type MutationResolver interface {
@@ -90,6 +97,9 @@ type PostResolver interface {
 type QueryResolver interface {
 	Posts(ctx context.Context) ([]*models.Post, error)
 	Post(ctx context.Context, id int) (*models.Post, error)
+}
+type SubscriptionResolver interface {
+	CommentPublished(ctx context.Context, postID int) (<-chan *models.Comment, error)
 }
 
 type executableSchema graphql.ExecutableSchemaState[ResolverRoot, DirectiveRoot, ComplexityRoot]
@@ -124,6 +134,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Comment.ID(childComplexity), true
+	case "Comment.level":
+		if e.ComplexityRoot.Comment.Level == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Comment.Level(childComplexity), true
 	case "Comment.postId":
 		if e.ComplexityRoot.Comment.PostID == nil {
 			break
@@ -243,6 +259,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Query.Posts(childComplexity), true
 
+	case "Subscription.commentPublished":
+		if e.ComplexityRoot.Subscription.CommentPublished == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_commentPublished_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Subscription.CommentPublished(childComplexity, args["postId"].(int)), true
+
 	case "User.id":
 		if e.ComplexityRoot.User.ID == nil {
 			break
@@ -310,6 +338,23 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
 			data := ec._Mutation(ctx, opCtx.Operation.SelectionSet)
 			var buf bytes.Buffer
+			data.MarshalGQL(&buf)
+
+			return &graphql.Response{
+				Data: buf.Bytes(),
+			}
+		}
+	case ast.Subscription:
+		next := ec._Subscription(ctx, opCtx.Operation.SelectionSet)
+
+		var buf bytes.Buffer
+		return func(ctx context.Context) *graphql.Response {
+			buf.Reset()
+			data := next(ctx)
+
+			if data == nil {
+				return nil
+			}
 			data.MarshalGQL(&buf)
 
 			return &graphql.Response{
@@ -429,6 +474,17 @@ func (ec *executionContext) field_Query_post_args(ctx context.Context, rawArgs m
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Subscription_commentPublished_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "postId", ec.unmarshalNID2int)
+	if err != nil {
+		return nil, err
+	}
+	args["postId"] = arg0
 	return args, nil
 }
 
@@ -629,6 +685,35 @@ func (ec *executionContext) fieldContext_Comment_content(_ context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _Comment_level(ctx context.Context, field graphql.CollectedField, obj *models.Comment) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Comment_level,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Comment().Level(ctx, obj)
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Comment_level(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Comment",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Comment_createdAt(ctx context.Context, field graphql.CollectedField, obj *models.Comment) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -692,6 +777,8 @@ func (ec *executionContext) fieldContext_Comment_replies(_ context.Context, fiel
 				return ec.fieldContext_Comment_userId(ctx, field)
 			case "content":
 				return ec.fieldContext_Comment_content(ctx, field)
+			case "level":
+				return ec.fieldContext_Comment_level(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Comment_createdAt(ctx, field)
 			case "replies":
@@ -840,6 +927,8 @@ func (ec *executionContext) fieldContext_Mutation_createComment(ctx context.Cont
 				return ec.fieldContext_Comment_userId(ctx, field)
 			case "content":
 				return ec.fieldContext_Comment_content(ctx, field)
+			case "level":
+				return ec.fieldContext_Comment_level(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Comment_createdAt(ctx, field)
 			case "replies":
@@ -1042,6 +1131,8 @@ func (ec *executionContext) fieldContext_Post_comments(ctx context.Context, fiel
 				return ec.fieldContext_Comment_userId(ctx, field)
 			case "content":
 				return ec.fieldContext_Comment_content(ctx, field)
+			case "level":
+				return ec.fieldContext_Comment_level(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Comment_createdAt(ctx, field)
 			case "replies":
@@ -1266,6 +1357,65 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 			}
 			return nil, fmt.Errorf("no field named %q was found under type __Schema", field.Name)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_commentPublished(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_commentPublished,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Subscription().CommentPublished(ctx, fc.Args["postId"].(int))
+		},
+		nil,
+		ec.marshalNComment2ᚖcommentSystemᚋinternalᚋmodelsᚐComment,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_commentPublished(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Comment_id(ctx, field)
+			case "replyCommentId":
+				return ec.fieldContext_Comment_replyCommentId(ctx, field)
+			case "postId":
+				return ec.fieldContext_Comment_postId(ctx, field)
+			case "userId":
+				return ec.fieldContext_Comment_userId(ctx, field)
+			case "content":
+				return ec.fieldContext_Comment_content(ctx, field)
+			case "level":
+				return ec.fieldContext_Comment_level(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Comment_createdAt(ctx, field)
+			case "replies":
+				return ec.fieldContext_Comment_replies(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Comment", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_commentPublished_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -2944,6 +3094,42 @@ func (ec *executionContext) _Comment(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "level":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Comment_level(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "createdAt":
 			field := field
 
@@ -3286,6 +3472,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 	}
 
 	return out
+}
+
+var subscriptionImplementors = []string{"Subscription"}
+
+func (ec *executionContext) _Subscription(ctx context.Context, sel ast.SelectionSet) func(ctx context.Context) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, subscriptionImplementors)
+	ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
+		Object: "Subscription",
+	})
+	if len(fields) != 1 {
+		graphql.AddErrorf(ctx, "must subscribe to exactly one stream")
+		return nil
+	}
+
+	switch fields[0].Name {
+	case "commentPublished":
+		return ec._Subscription_commentPublished(ctx, fields[0])
+	default:
+		panic("unknown field " + strconv.Quote(fields[0].Name))
+	}
 }
 
 var userImplementors = []string{"User"}
@@ -3743,6 +3949,22 @@ func (ec *executionContext) unmarshalNID2int(ctx context.Context, v any) (int, e
 func (ec *executionContext) marshalNID2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
 	_ = sel
 	res := models.MarshalID(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNInt2int32(ctx context.Context, v any) (int32, error) {
+	res, err := graphql.UnmarshalInt32(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNInt2int32(ctx context.Context, sel ast.SelectionSet, v int32) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalInt32(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")

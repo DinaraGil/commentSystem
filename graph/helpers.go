@@ -33,18 +33,49 @@ func buildCommentTree(comments []*models.Comment) []*models.Comment {
 	var roots []*models.Comment
 
 	for _, c := range comments {
-		c.Replies = []*models.Comment{}
 		commentMap[c.ID] = c
 	}
 
 	for _, c := range comments {
 		if c.ReplyCommentID != nil {
 			parent := commentMap[*c.ReplyCommentID]
-			parent.Replies = append(parent.Replies, c)
+			if parent != nil {
+				parent.Replies = append(parent.Replies, c)
+			}
 		} else {
 			roots = append(roots, c)
 		}
 	}
 
 	return roots
+}
+
+func flattenCommentsAsTree(comments []*models.Comment) []*models.Comment {
+	children := make(map[int][]*models.Comment)
+	var roots []*models.Comment
+
+	for _, c := range comments {
+		if c.ReplyCommentID == nil {
+			roots = append(roots, c)
+			continue
+		}
+		parentID := *c.ReplyCommentID
+		children[parentID] = append(children[parentID], c)
+	}
+
+	var result []*models.Comment
+
+	var walk func(c *models.Comment)
+	walk = func(c *models.Comment) {
+		result = append(result, c)
+		for _, child := range children[c.ID] {
+			walk(child)
+		}
+	}
+
+	for _, root := range roots {
+		walk(root)
+	}
+
+	return result
 }

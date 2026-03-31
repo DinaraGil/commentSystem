@@ -12,6 +12,11 @@ import (
 	"fmt"
 )
 
+// Level is the resolver for the level field.
+func (r *commentResolver) Level(ctx context.Context, obj *models.Comment) (int32, error) {
+	return int32(obj.CommentLevel), nil
+}
+
 // CreatedAt is the resolver for the createdAt field.
 func (r *commentResolver) CreatedAt(ctx context.Context, obj *models.Comment) (*models.Timestamp, error) {
 	t := models.Timestamp(obj.CreatedAt)
@@ -68,14 +73,32 @@ func (r *mutationResolver) CreateComment(ctx context.Context, input model.NewCom
 	}
 
 	var comment models.Comment
+	var replyCommentLevel = 1
+	var commentLevel = 1
 
-	query := `INSERT INTO comment (reply_comment_id, post_id, person_id, content) VALUES ($1, $2, $3, $4) returning comment_id, reply_comment_id, post_id, person_id, content, created_at;`
+	if input.ReplyCommentID != nil {
+		query := `SELECT comment_level FROM comment WHERE comment_id = $1`
+		err := r.DB.GetContext(ctx, &replyCommentLevel, query, *input.ReplyCommentID)
+		if err != nil {
+			return nil, fmt.Errorf("comment with id %d not found", *input.ReplyCommentID)
+		}
+		commentLevel = replyCommentLevel + 1
+	}
+	query := `INSERT INTO comment (reply_comment_id, comment_level, post_id, person_id, content) VALUES ($1, $2, $3, $4 ,$5) returning comment_id, reply_comment_id, comment_level, post_id, person_id, content, created_at;`
 
-	err = r.DB.QueryRowxContext(ctx, query, input.ReplyCommentID, input.PostID, input.UserID, input.Content).StructScan(&comment)
+	err = r.DB.QueryRowxContext(ctx, query, input.ReplyCommentID, commentLevel, input.PostID, input.UserID, input.Content).StructScan(&comment)
 
 	if err != nil {
 		return nil, err
 	}
+
+	//for _, observer := range r.CommentPublishedChannel[input.PostID] {
+	//	select {
+	//	case observer <- &comment: // если есть место в буфере
+	//	default:
+	//		// если канал забит, пропускаем, чтобы не блокировать
+	//	}
+	//}
 	return &comment, nil
 }
 
@@ -87,7 +110,23 @@ func (r *postResolver) CreatedAt(ctx context.Context, obj *models.Post) (*models
 
 // Comments is the resolver for the comments field.
 func (r *postResolver) Comments(ctx context.Context, obj *models.Post, limit *int32, offset *int32) ([]*models.Comment, error) {
-	var l int32 = 10
+	var comments []*models.Comment
+
+	query := `
+		SELECT comment_id, post_id, reply_comment_id, comment_level, person_id, content, created_at
+		FROM comment
+		WHERE post_id = $1
+		ORDER BY created_at ASC
+	`
+
+	err := r.DB.SelectContext(ctx, &comments, query, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	ordered := flattenCommentsAsTree(comments)
+
+	var l int32 = int32(len(ordered))
 	var o int32 = 0
 
 	if limit != nil {
@@ -97,33 +136,16 @@ func (r *postResolver) Comments(ctx context.Context, obj *models.Post, limit *in
 		o = *offset
 	}
 
-	var comments []*models.Comment
-
-	query := `
-		WITH RECURSIVE comment_tree AS (
-		SELECT *
-		FROM (
-			SELECT comment_id, post_id, person_id, content, reply_comment_id, created_at
-			FROM comment
-			WHERE post_id = $1 AND reply_comment_id IS NULL
-			ORDER BY created_at
-			LIMIT $2 OFFSET $3
-		) root
-	
-		UNION ALL
-	
-		SELECT c.comment_id, c.post_id, c.person_id, c.content, c.reply_comment_id, c.created_at
-		FROM comment c
-		JOIN comment_tree ct ON c.reply_comment_id = ct.comment_id
-	)
-	SELECT * FROM comment_tree ORDER BY created_at;`
-
-	err := r.DB.Select(&comments, query, obj.ID, l, o)
-	if err != nil {
-		return nil, err
+	if o > int32(len(ordered)) {
+		return []*models.Comment{}, nil
 	}
 
-	return buildCommentTree(comments), nil
+	end := o + l
+	if end > int32(len(ordered)) {
+		end = int32(len(ordered))
+	}
+
+	return ordered[o:end], nil
 }
 
 // Posts is the resolver for the posts field.
@@ -145,6 +167,32 @@ func (r *queryResolver) Post(ctx context.Context, id int) (*models.Post, error) 
 	return r.GetPostByID(ctx, id)
 }
 
+// CommentPublished is the resolver for the commentPublished field.
+func (r *subscriptionResolver) CommentPublished(ctx context.Context, postID int) (<-chan *models.Comment, error) {
+	commentEvent := make(chan *models.Comment, 10) // увеличил буфер
+
+	// Добавляем канал в карту подписчиков
+	r.mu.Lock() // используем mutex для безопасности
+	r.CommentPublishedChannel[postID] = append(r.CommentPublishedChannel[postID], commentEvent)
+	r.mu.Unlock()
+
+	// Горутинка для удаления канала при отключении клиента
+	go func() {
+		<-ctx.Done()
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		subs := r.CommentPublishedChannel[postID]
+		for i, ch := range subs {
+			if ch == commentEvent {
+				r.CommentPublishedChannel[postID] = append(subs[:i], subs[i+1:]...)
+				break
+			}
+		}
+	}()
+
+	return commentEvent, nil
+}
+
 // Comment returns CommentResolver implementation.
 func (r *Resolver) Comment() CommentResolver { return &commentResolver{r} }
 
@@ -157,7 +205,11 @@ func (r *Resolver) Post() PostResolver { return &postResolver{r} }
 // Query returns QueryResolver implementation.
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
+// Subscription returns SubscriptionResolver implementation.
+func (r *Resolver) Subscription() SubscriptionResolver { return &subscriptionResolver{r} }
+
 type commentResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type postResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type subscriptionResolver struct{ *Resolver }

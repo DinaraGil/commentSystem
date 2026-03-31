@@ -24,3 +24,6 @@ type NewUser struct {
 
 type Query struct {
 }
+
+type Subscription struct {
+}

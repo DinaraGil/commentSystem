@@ -2,9 +2,11 @@ package main
 
 import (
 	"commentSystem/graph"
+	"commentSystem/internal/models"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
@@ -17,7 +19,8 @@ import (
 	_ "github.com/lib/pq"
 )
 
-const defaultPort = "8080"
+const defaultPort = "8080" //env
+//env - in-memory or db
 
 func main() {
 	port := os.Getenv("PORT")
@@ -25,13 +28,16 @@ func main() {
 		port = defaultPort
 	}
 
-	db, err := sqlx.Connect("postgres", "postgres://postgres:postgres@localhost:5433/commentSystem?sslmode=disable")
+	db, err := sqlx.Connect("postgres", "postgres://postgres:postgres@localhost:5433/commentSystem?sslmode=disable") //env port
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{DB: db}}))
+	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{DB: db, CommentPublishedChannel: make(map[int][]chan *models.Comment)}}))
 
+	srv.AddTransport(transport.Websocket{
+		KeepAlivePingInterval: 10 * time.Second,
+	})
 	srv.AddTransport(transport.Options{})
 	srv.AddTransport(transport.GET{})
 	srv.AddTransport(transport.POST{})
