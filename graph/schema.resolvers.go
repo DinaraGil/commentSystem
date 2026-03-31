@@ -83,7 +83,16 @@ func (r *postResolver) CreatedAt(ctx context.Context, obj *models.Post) (*models
 
 // Posts is the resolver for the posts field.
 func (r *queryResolver) Posts(ctx context.Context) ([]*models.Post, error) {
-	panic(fmt.Errorf("not implemented: Posts - posts"))
+	var posts []*models.Post
+
+	query := `SELECT post_id, person_id, content, allow_comment, created_at FROM post;`
+	err := r.DB.Select(&posts, query)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return posts, nil
 }
 
 // Post is the resolver for the post field.
