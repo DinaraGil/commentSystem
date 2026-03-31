@@ -9,6 +9,7 @@ type Post {
   content: String!
   allowComment: Boolean!
   createdAt: Timestamp!
+  comments: [Comment!]!
 }
 
 type Comment {
@@ -18,6 +19,7 @@ type Comment {
     userId: ID!
     content: String!
     createdAt: Timestamp!
+    replies: [Comment!]!
 }
 
 input NewUser {

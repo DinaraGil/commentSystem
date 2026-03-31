@@ -9,4 +9,6 @@ type Comment struct {
 	UserID         int       `json:"userId" db:"person_id"`
 	Content        string    `json:"content" db:"content"`
 	CreatedAt      time.Time `json:"createdAt" db:"created_at"`
+
+	Replies []*Comment `json:"replies"`
 }

@@ -27,3 +27,24 @@ func (r *Resolver) GetPostByID(ctx context.Context, postId int) (*models.Post, e
 	}
 	return &post, err
 }
+
+func buildCommentTree(comments []*models.Comment) []*models.Comment {
+	commentMap := make(map[int]*models.Comment)
+	var roots []*models.Comment
+
+	for _, c := range comments {
+		c.Replies = []*models.Comment{}
+		commentMap[c.ID] = c
+	}
+
+	for _, c := range comments {
+		if c.ReplyCommentID != nil {
+			parent := commentMap[*c.ReplyCommentID]
+			parent.Replies = append(parent.Replies, c)
+		} else {
+			roots = append(roots, c)
+		}
+	}
+
+	return roots
+}

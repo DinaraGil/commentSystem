@@ -9,7 +9,6 @@ import (
 	"commentSystem/graph/model"
 	"commentSystem/internal/models"
 	"context"
-	"fmt"
 )
 
 // CreatedAt is the resolver for the createdAt field.
@@ -97,7 +96,31 @@ func (r *queryResolver) Posts(ctx context.Context) ([]*models.Post, error) {
 
 // Post is the resolver for the post field.
 func (r *queryResolver) Post(ctx context.Context, id int) (*models.Post, error) {
-	panic(fmt.Errorf("not implemented: Post - post"))
+	post, err := r.GetPostByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	var comments []*models.Comment
+	query := `
+        WITH RECURSIVE comment_tree AS (
+            SELECT comment_id, post_id, person_id, content, reply_comment_id, created_at
+            FROM comment
+            WHERE post_id = $1 AND reply_comment_id IS NULL
+            UNION ALL
+            SELECT c.comment_id, c.post_id, c.person_id, c.content, c.reply_comment_id, c.created_at
+            FROM comment c
+            INNER JOIN comment_tree ct ON c.reply_comment_id = ct.comment_id
+        )
+        SELECT * FROM comment_tree ORDER BY created_at
+    `
+	err = r.DB.Select(&comments, query, id)
+	if err != nil {
+		return nil, err
+	}
+
+	post.Comments = buildCommentTree(comments)
+	return post, nil
 }
 
 // Comment returns CommentResolver implementation.

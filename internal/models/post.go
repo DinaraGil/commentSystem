@@ -10,4 +10,6 @@ type Post struct {
 	Content      string    `json:"content" db:"content"`
 	AllowComment *bool     `json:"allowComment,omitempty" db:"allow_comment"`
 	CreatedAt    time.Time `json:"createdAt" db:"created_at"`
+
+	Comments []*Comment `json:"replies"`
 }
