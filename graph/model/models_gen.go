@@ -2,47 +2,24 @@
 
 package model
 
-import (
-	"commentSystem/internal/models"
-)
-
-type Comment struct {
-	ID           int          `json:"id"`
-	ReplyComment *Comment     `json:"replyComment,omitempty"`
-	Post         *Post        `json:"post,omitempty"`
-	User         *models.User `json:"user"`
-	Content      string       `json:"content"`
-	CreatedAt    string       `json:"createdAt"`
-}
-
 type Mutation struct {
 }
 
 type NewComment struct {
 	ReplyCommentID *int   `json:"replyCommentId,omitempty"`
-	PostID         *int   `json:"postId,omitempty"`
+	PostID         int    `json:"postId"`
 	UserID         int    `json:"userId"`
 	Content        string `json:"content"`
-	CreatedAt      string `json:"createdAt"`
 }
 
 type NewPost struct {
 	UserID       int    `json:"userId"`
 	Content      string `json:"content"`
 	AllowComment *bool  `json:"allowComment,omitempty"`
-	CreatedAt    string `json:"createdAt"`
 }
 
 type NewUser struct {
 	Username string `json:"username"`
-}
-
-type Post struct {
-	ID           int          `json:"id"`
-	User         *models.User `json:"user"`
-	Content      string       `json:"content"`
-	AllowComment bool         `json:"allowComment"`
-	CreatedAt    string       `json:"createdAt"`
 }
 
 type Query struct {

@@ -13,8 +13,6 @@ type User struct {
 	UserName string `json:"username" db:"username"`
 }
 
-type ID int
-
 func MarshalID(id int) graphql.Marshaler {
 	return graphql.WriterFunc(func(w io.Writer) {
 		io.WriteString(w, strconv.Quote(fmt.Sprintf("%d", id)))

@@ -12,6 +12,12 @@ import (
 	"fmt"
 )
 
+// CreatedAt is the resolver for the createdAt field.
+func (r *commentResolver) CreatedAt(ctx context.Context, obj *models.Comment) (*models.Timestamp, error) {
+	t := models.Timestamp(obj.CreatedAt)
+	return &t, nil
+}
+
 // CreateUser is the resolver for the createUser field.
 func (r *mutationResolver) CreateUser(ctx context.Context, input model.NewUser) (*models.User, error) {
 	var user models.User
@@ -27,39 +33,77 @@ func (r *mutationResolver) CreateUser(ctx context.Context, input model.NewUser) 
 }
 
 // CreatePost is the resolver for the createPost field.
-func (r *mutationResolver) CreatePost(ctx context.Context, input model.NewPost) (*model.Post, error) {
-	var user models.User
+func (r *mutationResolver) CreatePost(ctx context.Context, input model.NewPost) (*models.Post, error) {
+	_, err := r.GetUserByID(ctx, input.UserID)
+	if err != nil {
+		return nil, err
+	}
 
-	query := `INSERT INTO person (username) VALUES ($1) returning person_id, username;`
+	var post models.Post
 
-	err := r.DB.QueryRowxContext(ctx, query, input.Username).StructScan(&user)
+	query := `INSERT INTO post (person_id, content, allow_comment) VALUES ($1, $2, $3) returning post_id, person_id, content, allow_comment, created_at;`
+
+	err = r.DB.QueryRowxContext(ctx, query, input.UserID, input.Content, input.AllowComment).StructScan(&post)
 
 	if err != nil {
 		return nil, err
 	}
-	return &user, nil
+	return &post, nil
 }
 
 // CreateComment is the resolver for the createComment field.
-func (r *mutationResolver) CreateComment(ctx context.Context, input model.NewComment) (*model.Comment, error) {
-	panic(fmt.Errorf("not implemented: CreateComment - createComment"))
+func (r *mutationResolver) CreateComment(ctx context.Context, input model.NewComment) (*models.Comment, error) {
+	_, err := r.GetUserByID(ctx, input.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = r.GetPostByID(ctx, input.PostID)
+	if err != nil {
+		return nil, err
+	}
+
+	var comment models.Comment
+
+	query := `INSERT INTO comment (reply_comment_id, post_id, person_id, content) VALUES ($1, $2, $3, $4) returning comment_id, reply_comment_id, post_id, person_id, content, created_at;`
+
+	err = r.DB.QueryRowxContext(ctx, query, input.ReplyCommentID, input.PostID, input.UserID, input.Content).StructScan(&comment)
+
+	if err != nil {
+		return nil, err
+	}
+	return &comment, nil
+}
+
+// CreatedAt is the resolver for the createdAt field.
+func (r *postResolver) CreatedAt(ctx context.Context, obj *models.Post) (*models.Timestamp, error) {
+	t := models.Timestamp(obj.CreatedAt)
+	return &t, nil
 }
 
 // Posts is the resolver for the posts field.
-func (r *queryResolver) Posts(ctx context.Context) ([]*model.Post, error) {
+func (r *queryResolver) Posts(ctx context.Context) ([]*models.Post, error) {
 	panic(fmt.Errorf("not implemented: Posts - posts"))
 }
 
 // Post is the resolver for the post field.
-func (r *queryResolver) Post(ctx context.Context, id int) (*model.Post, error) {
+func (r *queryResolver) Post(ctx context.Context, id int) (*models.Post, error) {
 	panic(fmt.Errorf("not implemented: Post - post"))
 }
+
+// Comment returns CommentResolver implementation.
+func (r *Resolver) Comment() CommentResolver { return &commentResolver{r} }
 
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 
+// Post returns PostResolver implementation.
+func (r *Resolver) Post() PostResolver { return &postResolver{r} }
+
 // Query returns QueryResolver implementation.
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
+type commentResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
+type postResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }

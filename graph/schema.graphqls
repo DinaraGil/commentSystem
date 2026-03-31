@@ -5,19 +5,19 @@ type User {
 
 type Post {
   id: ID!
-  user: User!
+  userId: ID!
   content: String!
   allowComment: Boolean!
-  createdAt: String!
+  createdAt: Timestamp!
 }
 
 type Comment {
     id: ID!
-    replyComment: Comment
-    post: Post
-    user: User!
+    replyCommentId: ID
+    postId: ID!
+    userId: ID!
     content: String!
-    createdAt: String!
+    createdAt: Timestamp!
 }
 
 input NewUser {
@@ -28,15 +28,13 @@ input NewPost {
     userId: ID!
     content: String!
     allowComment: Boolean = true
-    createdAt: String!
 }
 
 input NewComment {
     replyCommentId: ID
-    postId: ID
+    postId: ID!
     userId: ID!
     content: String!
-    createdAt: String!
 }
 
 type Mutation {
@@ -51,3 +49,5 @@ type Query {
     posts: [Post!]!
     post(id: ID!): Post
 }
+
+scalar Timestamp
