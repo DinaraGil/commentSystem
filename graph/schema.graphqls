@@ -9,7 +9,7 @@ type Post {
   content: String!
   allowComment: Boolean!
   createdAt: Timestamp!
-  comments: [Comment!]!
+  comments(limit: Int = 10, offset: Int = 0): [Comment!]!
 }
 
 type Comment {

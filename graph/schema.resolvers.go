@@ -85,6 +85,47 @@ func (r *postResolver) CreatedAt(ctx context.Context, obj *models.Post) (*models
 	return &t, nil
 }
 
+// Comments is the resolver for the comments field.
+func (r *postResolver) Comments(ctx context.Context, obj *models.Post, limit *int32, offset *int32) ([]*models.Comment, error) {
+	var l int32 = 10
+	var o int32 = 0
+
+	if limit != nil {
+		l = *limit
+	}
+	if offset != nil {
+		o = *offset
+	}
+
+	var comments []*models.Comment
+
+	query := `
+		WITH RECURSIVE comment_tree AS (
+		SELECT *
+		FROM (
+			SELECT comment_id, post_id, person_id, content, reply_comment_id, created_at
+			FROM comment
+			WHERE post_id = $1 AND reply_comment_id IS NULL
+			ORDER BY created_at
+			LIMIT $2 OFFSET $3
+		) root
+	
+		UNION ALL
+	
+		SELECT c.comment_id, c.post_id, c.person_id, c.content, c.reply_comment_id, c.created_at
+		FROM comment c
+		JOIN comment_tree ct ON c.reply_comment_id = ct.comment_id
+	)
+	SELECT * FROM comment_tree ORDER BY created_at;`
+
+	err := r.DB.Select(&comments, query, obj.ID, l, o)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildCommentTree(comments), nil
+}
+
 // Posts is the resolver for the posts field.
 func (r *queryResolver) Posts(ctx context.Context) ([]*models.Post, error) {
 	var posts []*models.Post
@@ -101,31 +142,7 @@ func (r *queryResolver) Posts(ctx context.Context) ([]*models.Post, error) {
 
 // Post is the resolver for the post field.
 func (r *queryResolver) Post(ctx context.Context, id int) (*models.Post, error) {
-	post, err := r.GetPostByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	var comments []*models.Comment
-	query := `
-        WITH RECURSIVE comment_tree AS (
-            SELECT comment_id, post_id, person_id, content, reply_comment_id, created_at
-            FROM comment
-            WHERE post_id = $1 AND reply_comment_id IS NULL
-            UNION ALL
-            SELECT c.comment_id, c.post_id, c.person_id, c.content, c.reply_comment_id, c.created_at
-            FROM comment c
-            INNER JOIN comment_tree ct ON c.reply_comment_id = ct.comment_id
-        )
-        SELECT * FROM comment_tree ORDER BY created_at
-    `
-	err = r.DB.Select(&comments, query, id)
-	if err != nil {
-		return nil, err
-	}
-
-	post.Comments = buildCommentTree(comments)
-	return post, nil
+	return r.GetPostByID(ctx, id)
 }
 
 // Comment returns CommentResolver implementation.
