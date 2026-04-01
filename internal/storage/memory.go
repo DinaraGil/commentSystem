@@ -8,6 +8,7 @@ import (
 	"sort"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 type MemoryStorage struct {
@@ -111,7 +112,9 @@ func (s *MemoryStorage) GetPosts(ctx context.Context) ([]*models.Post, error) {
 func (s *MemoryStorage) CreateComment(ctx context.Context, input model.NewComment) (*models.Comment, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
+	if utf8.RuneCountInString(input.Content) > 2000 {
+		return nil, fmt.Errorf("the comment should contain less than 2000")
+	}
 	if _, ok := s.users[input.UserID]; !ok {
 		return nil, fmt.Errorf("user with id %d not found", input.UserID)
 	}
