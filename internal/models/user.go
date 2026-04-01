@@ -25,5 +25,5 @@ func UnmarshalID(v interface{}) (int, error) {
 		return 0, fmt.Errorf("ids must be strings")
 	}
 	i, e := strconv.Atoi(id)
-	return int(i), e
+	return i, e
 }

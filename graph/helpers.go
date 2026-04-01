@@ -1,17 +1,26 @@
 package graph
 
-import "commentSystem/internal/models"
-
-import "sort"
+import (
+	"commentSystem/internal/models"
+	"sort"
+)
 
 var subscriberCounter uint64
 
-func flattenCommentsAsTree(
+func getPaginatedComments(
 	comments []*models.Comment,
 	limit *int32,
 	offset *int32,
 	level *int32,
 ) []*models.Comment {
+	children, roots := buildCommentTree(comments)
+	sortComments(roots, children)
+	selectedRoots := applyPagination(roots, limit, offset)
+
+	return flattenTreeIterative(selectedRoots, children, level)
+}
+
+func buildCommentTree(comments []*models.Comment) (map[int][]*models.Comment, []*models.Comment) {
 	children := make(map[int][]*models.Comment)
 	roots := make([]*models.Comment, 0)
 
@@ -25,6 +34,10 @@ func flattenCommentsAsTree(
 		children[parentID] = append(children[parentID], c)
 	}
 
+	return children, roots
+}
+
+func sortComments(roots []*models.Comment, children map[int][]*models.Comment) {
 	sort.Slice(roots, func(i, j int) bool {
 		return roots[i].CreatedAt.After(roots[j].CreatedAt)
 	})
@@ -34,7 +47,13 @@ func flattenCommentsAsTree(
 			return children[parentID][i].CreatedAt.After(children[parentID][j].CreatedAt)
 		})
 	}
+}
 
+func applyPagination(
+	roots []*models.Comment,
+	limit *int32,
+	offset *int32,
+) []*models.Comment {
 	var l int32 = int32(len(roots))
 	var o int32 = 0
 
@@ -54,25 +73,37 @@ func flattenCommentsAsTree(
 		end = int32(len(roots))
 	}
 
-	selectedRoots := roots[o:end]
+	return roots[o:end]
+}
 
+func flattenTreeIterative(
+	roots []*models.Comment,
+	children map[int][]*models.Comment,
+	level *int32,
+) []*models.Comment {
 	result := make([]*models.Comment, 0)
 
-	var walk func(c *models.Comment)
-	walk = func(c *models.Comment) {
-		if level != nil && int32(c.CommentLevel) > *level {
-			return
-		}
+	stack := make([]*models.Comment, 0, len(roots))
 
-		result = append(result, c)
-
-		for _, child := range children[c.ID] {
-			walk(child)
-		}
+	for i := len(roots) - 1; i >= 0; i-- {
+		stack = append(stack, roots[i])
 	}
 
-	for _, root := range selectedRoots {
-		walk(root)
+	for len(stack) > 0 {
+		last := len(stack) - 1
+		current := stack[last]
+		stack = stack[:last]
+
+		if level != nil && int32(current.CommentLevel) > *level {
+			continue
+		}
+
+		result = append(result, current)
+
+		currentChildren := children[current.ID]
+		for i := len(currentChildren) - 1; i >= 0; i-- {
+			stack = append(stack, currentChildren[i])
+		}
 	}
 
 	return result

@@ -12,7 +12,6 @@ import (
 // here.
 
 type Resolver struct {
-	//DB                      *sqlx.DB
 	Store                   storage.Storage
 	mu                      sync.RWMutex
 	CommentPublishedChannel map[int]map[string]chan *models.Comment

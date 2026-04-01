@@ -2,6 +2,7 @@ package main
 
 import (
 	"commentSystem/graph"
+	"commentSystem/graph/loaders"
 	"commentSystem/internal/models"
 	"commentSystem/internal/storage"
 	"log"
@@ -17,8 +18,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
-const defaultPort = "8080" //env
-//env - in-memory or db
+const defaultPort = "8080"
 
 func main() {
 	port := os.Getenv("APP_PORT")
@@ -32,6 +32,7 @@ func main() {
 	}
 
 	var store storage.Storage
+	var postgresDB *sqlx.DB
 
 	switch storageType {
 	case "memory":
@@ -49,6 +50,7 @@ func main() {
 			log.Fatalf("failed to connect to postgres: %v", err)
 		}
 
+		postgresDB = db
 		store = storage.NewPostgresStorage(db)
 		log.Println("connected to postgres")
 
@@ -56,26 +58,33 @@ func main() {
 		log.Fatalf("unknown STORAGE_TYPE: %s", storageType)
 	}
 
-	srv := handler.New(graph.NewExecutableSchema(graph.Config{
-		Resolvers: &graph.Resolver{
-			Store:                   store,
-			CommentPublishedChannel: make(map[int]map[string]chan *models.Comment),
-		},
-	}))
+	srv := handler.New(
+		graph.NewExecutableSchema(
+			graph.Config{
+				Resolvers: &graph.Resolver{
+					Store:                   store,
+					CommentPublishedChannel: make(map[int]map[string]chan *models.Comment),
+				},
+			},
+		),
+	)
 
 	srv.AddTransport(&transport.Websocket{})
 	srv.AddTransport(transport.Options{})
 	srv.AddTransport(transport.GET{})
 	srv.AddTransport(transport.POST{})
 
-	//srv.SetQueryCache(lru.New)
 	srv.Use(extension.Introspection{})
-	//srv.Use(extension.AutomaticPersistedQuery{
-	//	Cache: lru.New,
-	//})
 
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
-	http.Handle("/query", srv)
+
+	var gqlHandler http.Handler = srv
+
+	if storageType == "postgres" && postgresDB != nil {
+		gqlHandler = loaders.Middleware(postgresDB.DB, gqlHandler)
+	}
+
+	http.Handle("/query", gqlHandler)
 
 	log.Printf("storage=%s", storageType)
 	log.Printf("connect to http://localhost:%s/ for GraphQL playground", port)

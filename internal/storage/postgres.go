@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 type PostgresStorage struct {
@@ -134,4 +135,30 @@ func (s *PostgresStorage) GetCommentsByPostID(ctx context.Context, postID int) (
 	}
 
 	return comments, nil
+}
+
+func (s *PostgresStorage) GetCommentsByPostIDs(ctx context.Context, postIDs []int) (map[int][]*models.Comment, error) {
+	result := make(map[int][]*models.Comment, len(postIDs))
+	for _, postID := range postIDs {
+		result[postID] = []*models.Comment{}
+	}
+
+	var comments []*models.Comment
+	query := `
+		SELECT comment_id, post_id, reply_comment_id, comment_level, user_id, content, created_at
+		FROM comment
+		WHERE post_id = ANY($1)
+		ORDER BY created_at ASC
+	`
+
+	err := s.db.SelectContext(ctx, &comments, query, pq.Array(postIDs))
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range comments {
+		result[c.PostID] = append(result[c.PostID], c)
+	}
+
+	return result, nil
 }
