@@ -2,9 +2,8 @@ package graph
 
 import (
 	"commentSystem/internal/models"
+	"commentSystem/internal/storage"
 	"sync"
-
-	"github.com/jmoiron/sqlx"
 )
 
 // This file will not be regenerated automatically.
@@ -13,7 +12,8 @@ import (
 // here.
 
 type Resolver struct {
-	DB                      *sqlx.DB
+	//DB                      *sqlx.DB
+	Store                   storage.Storage
 	mu                      sync.Mutex
 	CommentPublishedChannel map[int][]chan *models.Comment
 }

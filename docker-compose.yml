@@ -1,17 +1,64 @@
-version: "3.9"
+#version: "3.9"
+#
+#services:
+#  db:
+#    image: postgres:16
+#    environment:
+#      POSTGRES_USER: postgres
+#      POSTGRES_PASSWORD: postgres
+#      POSTGRES_DB: commentSystem
+#    ports:
+#      - "5433:5432"
+#    volumes:
+#      - postgres_data:/var/lib/postgresql/data
+#      - ./internal/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+#
+#volumes:
+#  postgres_data:
+#
+#
 
 services:
+  app-memory:
+    build: .
+    ports:
+      - "${APP_PORT}:8080"
+    environment:
+      STORAGE_TYPE: ${STORAGE_TYPE}
+    profiles:
+      - memory
+
+  app-postgres:
+    build: .
+    ports:
+      - "${APP_PORT}:8080"
+    environment:
+      STORAGE_TYPE: ${STORAGE_TYPE}
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - postgres
+
   db:
     image: postgres:16
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: commentSystem
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./internal/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d commentSystem"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    profiles:
+      - postgres
 
 volumes:
   postgres_data:

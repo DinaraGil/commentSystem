@@ -59,7 +59,7 @@ type ComplexityRoot struct {
 
 	Post struct {
 		AllowComment func(childComplexity int) int
-		Comments     func(childComplexity int, limit *int32, offset *int32) int
+		Comments     func(childComplexity int, limit *int32, offset *int32, level *int32) int
 		Content      func(childComplexity int) int
 		CreatedAt    func(childComplexity int) int
 		ID           func(childComplexity int) int
@@ -92,7 +92,7 @@ type MutationResolver interface {
 }
 type PostResolver interface {
 	CreatedAt(ctx context.Context, obj *models.Post) (*models.Timestamp, error)
-	Comments(ctx context.Context, obj *models.Post, limit *int32, offset *int32) ([]*models.Comment, error)
+	Comments(ctx context.Context, obj *models.Post, limit *int32, offset *int32, level *int32) ([]*models.Comment, error)
 }
 type QueryResolver interface {
 	Posts(ctx context.Context) ([]*models.Post, error)
@@ -215,7 +215,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Post.Comments(childComplexity, args["limit"].(*int32), args["offset"].(*int32)), true
+		return e.ComplexityRoot.Post.Comments(childComplexity, args["limit"].(*int32), args["offset"].(*int32), args["level"].(*int32)), true
 	case "Post.content":
 		if e.ComplexityRoot.Post.Content == nil {
 			break
@@ -452,6 +452,11 @@ func (ec *executionContext) field_Post_comments_args(ctx context.Context, rawArg
 		return nil, err
 	}
 	args["offset"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "level", ec.unmarshalOInt2ᚖint32)
+	if err != nil {
+		return nil, err
+	}
+	args["level"] = arg2
 	return args, nil
 }
 
@@ -1104,7 +1109,7 @@ func (ec *executionContext) _Post_comments(ctx context.Context, field graphql.Co
 		ec.fieldContext_Post_comments,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Post().Comments(ctx, obj, fc.Args["limit"].(*int32), fc.Args["offset"].(*int32))
+			return ec.Resolvers.Post().Comments(ctx, obj, fc.Args["limit"].(*int32), fc.Args["offset"].(*int32), fc.Args["level"].(*int32))
 		},
 		nil,
 		ec.marshalNComment2ᚕᚖcommentSystemᚋinternalᚋmodelsᚐCommentᚄ,
