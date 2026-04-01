@@ -55,6 +55,8 @@ import "commentSystem/internal/models"
 
 import "sort"
 
+var subscriberCounter uint64
+
 func flattenCommentsAsTree(
 	comments []*models.Comment,
 	limit *int32,

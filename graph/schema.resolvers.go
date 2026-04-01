@@ -9,6 +9,8 @@ import (
 	"commentSystem/graph/model"
 	"commentSystem/internal/models"
 	"context"
+	"strconv"
+	"sync/atomic"
 )
 
 // Level is the resolver for the level field.
@@ -34,19 +36,33 @@ func (r *mutationResolver) CreatePost(ctx context.Context, input model.NewPost) 
 
 // CreateComment is the resolver for the createComment field.
 func (r *mutationResolver) CreateComment(ctx context.Context, input model.NewComment) (*models.Comment, error) {
-
-	//for _, observer := range r.CommentPublishedChannel[input.PostID] {
-	//	select {
-	//	case observer <- &comment: // если есть место в буфере
-	//	default:
-	//		// если канал забит, пропускаем, чтобы не блокировать
-	//	}
-	//}
-	//return &comment, nil
-
 	comment, err := r.Store.CreateComment(ctx, input)
 	if err != nil {
 		return nil, err
+	}
+
+	postID := int(comment.PostID)
+
+	// Копируем подписчиков, чтобы не держать lock во время отправки
+	r.mu.RLock()
+	subscribersMap := r.CommentPublishedChannel[postID]
+
+	subscribers := make([]chan *models.Comment, 0, len(subscribersMap))
+	for _, ch := range subscribersMap {
+		subscribers = append(subscribers, ch)
+	}
+	r.mu.RUnlock()
+
+	// Рассылка всем подписчикам конкретного postID
+	//for _, observer := range subscribers {
+	//	select {
+	//	case observer <- comment:
+	//	default:
+	//		// канал занят, не блокируем mutation
+	//	}
+	//}
+	for _, observer := range subscribers {
+		observer <- comment
 	}
 
 	return comment, nil
@@ -86,25 +102,27 @@ func (r *queryResolver) Post(ctx context.Context, id int) (*models.Post, error) 
 
 // CommentPublished is the resolver for the commentPublished field.
 func (r *subscriptionResolver) CommentPublished(ctx context.Context, postID int) (<-chan *models.Comment, error) {
-	commentEvent := make(chan *models.Comment, 10) // увеличил буфер
+	commentEvent := make(chan *models.Comment, 1)
+	subscriberID := strconv.FormatUint(atomic.AddUint64(&subscriberCounter, 1), 10)
 
-	// Добавляем канал в карту подписчиков
-	r.mu.Lock() // используем mutex для безопасности
-	r.CommentPublishedChannel[postID] = append(r.CommentPublishedChannel[postID], commentEvent)
+	r.mu.Lock()
+	if r.CommentPublishedChannel[postID] == nil {
+		r.CommentPublishedChannel[postID] = make(map[string]chan *models.Comment)
+	}
+	r.CommentPublishedChannel[postID][subscriberID] = commentEvent
 	r.mu.Unlock()
 
-	// Горутинка для удаления канала при отключении клиента
 	go func() {
 		<-ctx.Done()
+
 		r.mu.Lock()
-		defer r.mu.Unlock()
-		subs := r.CommentPublishedChannel[postID]
-		for i, ch := range subs {
-			if ch == commentEvent {
-				r.CommentPublishedChannel[postID] = append(subs[:i], subs[i+1:]...)
-				break
+		if subscribers, ok := r.CommentPublishedChannel[postID]; ok {
+			delete(subscribers, subscriberID)
+			if len(subscribers) == 0 {
+				delete(r.CommentPublishedChannel, postID)
 			}
 		}
+		r.mu.Unlock()
 	}()
 
 	return commentEvent, nil

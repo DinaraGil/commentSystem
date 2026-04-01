@@ -14,12 +14,6 @@ import (
 type Resolver struct {
 	//DB                      *sqlx.DB
 	Store                   storage.Storage
-	mu                      sync.Mutex
-	CommentPublishedChannel map[int][]chan *models.Comment
+	mu                      sync.RWMutex
+	CommentPublishedChannel map[int]map[string]chan *models.Comment
 }
-
-//var commentPublishedChannel map[int][]chan *models.Comment
-//
-//func init() {
-//	commentPublishedChannel = map[int][]chan *models.Comment{}
-//}
