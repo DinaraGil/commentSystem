@@ -123,7 +123,6 @@ func TestSubscription_OtherPostDoesNotReceiveComment(t *testing.T) {
 	case got := <-ch:
 		t.Fatalf("unexpected comment received for another post: %+v", got)
 	case <-time.After(200 * time.Millisecond):
-		// ok
 	}
 }
 

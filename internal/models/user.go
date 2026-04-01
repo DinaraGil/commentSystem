@@ -9,7 +9,7 @@ import (
 )
 
 type User struct {
-	ID       int    `json:"id" db:"person_id"`
+	ID       int    `json:"id" db:"user_id"`
 	UserName string `json:"username" db:"username"`
 }
 

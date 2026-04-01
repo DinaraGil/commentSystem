@@ -70,7 +70,7 @@ func (s *MemoryStorage) CreatePost(ctx context.Context, input model.NewPost) (*m
 	allowComment := input.AllowComment
 	post := &models.Post{
 		ID:           s.nextPostID,
-		UserId:       input.UserID,
+		UserID:       input.UserID,
 		Content:      input.Content,
 		AllowComment: allowComment,
 		CreatedAt:    time.Now(),

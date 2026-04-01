@@ -51,8 +51,8 @@ func TestMemoryStorage_CreatePost_Success(t *testing.T) {
 		t.Fatalf("expected post ID = 1, got %d", post.ID)
 	}
 
-	if post.UserId != user.ID {
-		t.Fatalf("expected post.UserId = %d, got %d", user.ID, post.UserId)
+	if post.UserID != user.ID {
+		t.Fatalf("expected post.UserId = %d, got %d", user.ID, post.UserID)
 	}
 
 	if post.Content != "hello post" {

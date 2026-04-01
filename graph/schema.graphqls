@@ -5,7 +5,7 @@ type User {
 
 type Post {
   id: ID!
-  userId: ID!
+  userID: ID!
   content: String!
   allowComment: Boolean!
   createdAt: Timestamp!
@@ -14,9 +14,9 @@ type Post {
 
 type Comment {
     id: ID!
-    replyCommentId: ID
-    postId: ID!
-    userId: ID!
+    replyCommentID: ID
+    postID: ID!
+    userID: ID!
     content: String!
     level: Int!
     createdAt: Timestamp!
@@ -28,15 +28,15 @@ input NewUser {
 }
 
 input NewPost {
-    userId: ID!
+    userID: ID!
     content: String!
     allowComment: Boolean = true
 }
 
 input NewComment {
-    replyCommentId: ID
-    postId: ID!
-    userId: ID!
+    replyCommentID: ID
+    postID: ID!
+    userID: ID!
     content: String!
 }
 
@@ -50,11 +50,11 @@ type Mutation {
 
 type Query {
     posts: [Post!]!
-    post(id: ID!): Post
+    post(postID: ID!): Post
 }
 
 type Subscription {
-    commentPublished(postId: ID!): Comment!
+    commentPublished(postID: ID!): Comment!
 }
 
 scalar Timestamp

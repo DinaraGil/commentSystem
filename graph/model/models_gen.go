@@ -6,14 +6,14 @@ type Mutation struct {
 }
 
 type NewComment struct {
-	ReplyCommentID *int   `json:"replyCommentId,omitempty"`
-	PostID         int    `json:"postId"`
-	UserID         int    `json:"userId"`
+	ReplyCommentID *int   `json:"replyCommentID,omitempty"`
+	PostID         int    `json:"postID"`
+	UserID         int    `json:"userID"`
 	Content        string `json:"content"`
 }
 
 type NewPost struct {
-	UserID       int    `json:"userId"`
+	UserID       int    `json:"userID"`
 	Content      string `json:"content"`
 	AllowComment *bool  `json:"allowComment,omitempty"`
 }

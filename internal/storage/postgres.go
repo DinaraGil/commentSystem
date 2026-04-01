@@ -20,7 +20,7 @@ func NewPostgresStorage(db *sqlx.DB) *PostgresStorage {
 func (s *PostgresStorage) CreateUser(ctx context.Context, input model.NewUser) (*models.User, error) {
 	var user models.User
 
-	query := `INSERT INTO person (username) VALUES ($1) RETURNING person_id, username`
+	query := `INSERT INTO user_data (username) VALUES ($1) RETURNING user_id, username`
 	err := s.db.QueryRowxContext(ctx, query, input.Username).StructScan(&user)
 	if err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ func (s *PostgresStorage) CreateUser(ctx context.Context, input model.NewUser) (
 func (s *PostgresStorage) GetUserByID(ctx context.Context, id int) (*models.User, error) {
 	var user models.User
 
-	query := `SELECT person_id, username FROM person WHERE person_id = $1`
+	query := `SELECT user_id, username FROM user_data WHERE user_id = $1`
 	err := s.db.GetContext(ctx, &user, query, id)
 	if err != nil {
 		return nil, fmt.Errorf("user with id %d not found", id)
@@ -47,9 +47,9 @@ func (s *PostgresStorage) CreatePost(ctx context.Context, input model.NewPost) (
 	}
 
 	var post models.Post
-	query := `INSERT INTO post (person_id, content, allow_comment)
+	query := `INSERT INTO post (user_id, content, allow_comment)
 	          VALUES ($1, $2, $3)
-	          RETURNING post_id, person_id, content, allow_comment, created_at`
+	          RETURNING post_id, user_id, content, allow_comment, created_at`
 	err := s.db.QueryRowxContext(ctx, query, input.UserID, input.Content, input.AllowComment).StructScan(&post)
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (s *PostgresStorage) CreatePost(ctx context.Context, input model.NewPost) (
 func (s *PostgresStorage) GetPostByID(ctx context.Context, id int) (*models.Post, error) {
 	var post models.Post
 
-	query := `SELECT post_id, person_id, content, allow_comment, created_at FROM post WHERE post_id = $1`
+	query := `SELECT post_id, user_id, content, allow_comment, created_at FROM post WHERE post_id = $1`
 	err := s.db.GetContext(ctx, &post, query, id)
 	if err != nil {
 		return nil, fmt.Errorf("post with id %d not found", id)
@@ -73,7 +73,7 @@ func (s *PostgresStorage) GetPostByID(ctx context.Context, id int) (*models.Post
 func (s *PostgresStorage) GetPosts(ctx context.Context) ([]*models.Post, error) {
 	var posts []*models.Post
 
-	query := `SELECT post_id, person_id, content, allow_comment, created_at FROM post`
+	query := `SELECT post_id, user_id, content, allow_comment, created_at FROM post`
 	err := s.db.SelectContext(ctx, &posts, query)
 	if err != nil {
 		return nil, err
@@ -108,9 +108,9 @@ func (s *PostgresStorage) CreateComment(ctx context.Context, input model.NewComm
 	}
 
 	var comment models.Comment
-	query := `INSERT INTO comment (reply_comment_id, comment_level, post_id, person_id, content)
+	query := `INSERT INTO comment (reply_comment_id, comment_level, post_id, user_id, content)
 	          VALUES ($1, $2, $3, $4, $5)
-	          RETURNING comment_id, reply_comment_id, comment_level, post_id, person_id, content, created_at`
+	          RETURNING comment_id, reply_comment_id, comment_level, post_id, user_id, content, created_at`
 	err = s.db.QueryRowxContext(ctx, query, input.ReplyCommentID, commentLevel, input.PostID, input.UserID, input.Content).StructScan(&comment)
 	if err != nil {
 		return nil, err
@@ -123,7 +123,7 @@ func (s *PostgresStorage) GetCommentsByPostID(ctx context.Context, postID int) (
 	var comments []*models.Comment
 
 	query := `
-		SELECT comment_id, post_id, reply_comment_id, comment_level, person_id, content, created_at
+		SELECT comment_id, post_id, reply_comment_id, comment_level, user_id, content, created_at
 		FROM comment
 		WHERE post_id = $1
 		ORDER BY created_at ASC

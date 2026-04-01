@@ -75,13 +75,7 @@ func (r *postResolver) CreatedAt(ctx context.Context, obj *models.Post) (*models
 }
 
 // Comments is the resolver for the comments field.
-func (r *postResolver) Comments(
-	ctx context.Context,
-	obj *models.Post,
-	limit *int32,
-	offset *int32,
-	level *int32,
-) ([]*models.Comment, error) {
+func (r *postResolver) Comments(ctx context.Context, obj *models.Post, limit *int32, offset *int32, level *int32) ([]*models.Comment, error) {
 	comments, err := r.Store.GetCommentsByPostID(ctx, obj.ID)
 	if err != nil {
 		return nil, err
@@ -96,8 +90,8 @@ func (r *queryResolver) Posts(ctx context.Context) ([]*models.Post, error) {
 }
 
 // Post is the resolver for the post field.
-func (r *queryResolver) Post(ctx context.Context, id int) (*models.Post, error) {
-	return r.Store.GetPostByID(ctx, id)
+func (r *queryResolver) Post(ctx context.Context, postID int) (*models.Post, error) {
+	return r.Store.GetPostByID(ctx, postID)
 }
 
 // CommentPublished is the resolver for the commentPublished field.
