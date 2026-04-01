@@ -82,38 +82,4 @@ func main() {
 	log.Printf("storage=%s", storageType)
 	log.Printf("connect to http://localhost:%s/ for GraphQL playground", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
-	//
-	//databaseURL := os.Getenv("DATABASE_URL")
-	//if databaseURL == "" {
-	//	log.Fatal("DATABASE_URL is required when STORAGE_TYPE=postgres")
-	//}
-	//
-	//db, err := sqlx.Connect("postgres", databaseURL)
-	//
-	////	db, err := sqlx.Connect("postgres", "postgres://postgres:postgres@localhost:5433/commentSystem?sslmode=disable") //env port
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//
-	//srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{DB: db, CommentPublishedChannel: make(map[int][]chan *models.Comment)}}))
-	//
-	//srv.AddTransport(transport.Websocket{
-	//	KeepAlivePingInterval: 10 * time.Second,
-	//})
-	//srv.AddTransport(transport.Options{})
-	//srv.AddTransport(transport.GET{})
-	//srv.AddTransport(transport.POST{})
-	//
-	//srv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
-	//
-	//srv.Use(extension.Introspection{})
-	//srv.Use(extension.AutomaticPersistedQuery{
-	//	Cache: lru.New[string](100),
-	//})
-	//
-	//http.Handle("/", playground.Handler("GraphQL playground", "/query"))
-	//http.Handle("/query", srv)
-	//
-	//log.Printf("connect to http://localhost:%s/ for GraphQL playground", port)
-	//log.Fatal(http.ListenAndServe(":"+port, nil))
 }

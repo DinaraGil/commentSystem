@@ -24,75 +24,16 @@ func (r *commentResolver) CreatedAt(ctx context.Context, obj *models.Comment) (*
 
 // CreateUser is the resolver for the createUser field.
 func (r *mutationResolver) CreateUser(ctx context.Context, input model.NewUser) (*models.User, error) {
-	//var user models.User
-	//
-	//query := `INSERT INTO person (username) VALUES ($1) returning person_id, username;`
-	//
-	//err := r.DB.QueryRowxContext(ctx, query, input.Username).StructScan(&user)
-	//
-	//if err != nil {
-	//	return nil, err
-	//}
-	//return &user, nil
 	return r.Store.CreateUser(ctx, input)
 }
 
 // CreatePost is the resolver for the createPost field.
 func (r *mutationResolver) CreatePost(ctx context.Context, input model.NewPost) (*models.Post, error) {
-	//_, err := r.GetUserByID(ctx, input.UserID)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//var post models.Post
-	//
-	//query := `INSERT INTO post (person_id, content, allow_comment) VALUES ($1, $2, $3) returning post_id, person_id, content, allow_comment, created_at;`
-	//
-	//err = r.DB.QueryRowxContext(ctx, query, input.UserID, input.Content, input.AllowComment).StructScan(&post)
-	//
-	//if err != nil {
-	//	return nil, err
-	//}
-	//return &post, nil
 	return r.Store.CreatePost(ctx, input)
-
 }
 
 // CreateComment is the resolver for the createComment field.
 func (r *mutationResolver) CreateComment(ctx context.Context, input model.NewComment) (*models.Comment, error) {
-	//_, err := r.GetUserByID(ctx, input.UserID)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//post, err := r.GetPostByID(ctx, input.PostID)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//if !(*post.AllowComment) {
-	//	return nil, fmt.Errorf("the user with id %d has disabled comments", input.UserID)
-	//}
-	//
-	//var comment models.Comment
-	//var replyCommentLevel = 1
-	//var commentLevel = 1
-	//
-	//if input.ReplyCommentID != nil {
-	//	query := `SELECT comment_level FROM comment WHERE comment_id = $1`
-	//	err := r.DB.GetContext(ctx, &replyCommentLevel, query, *input.ReplyCommentID)
-	//	if err != nil {
-	//		return nil, fmt.Errorf("comment with id %d not found", *input.ReplyCommentID)
-	//	}
-	//	commentLevel = replyCommentLevel + 1
-	//}
-	//query := `INSERT INTO comment (reply_comment_id, comment_level, post_id, person_id, content) VALUES ($1, $2, $3, $4 ,$5) returning comment_id, reply_comment_id, comment_level, post_id, person_id, content, created_at;`
-	//
-	//err = r.DB.QueryRowxContext(ctx, query, input.ReplyCommentID, commentLevel, input.PostID, input.UserID, input.Content).StructScan(&comment)
-	//
-	//if err != nil {
-	//	return nil, err
-	//}
 
 	//for _, observer := range r.CommentPublishedChannel[input.PostID] {
 	//	select {
@@ -102,6 +43,7 @@ func (r *mutationResolver) CreateComment(ctx context.Context, input model.NewCom
 	//	}
 	//}
 	//return &comment, nil
+
 	comment, err := r.Store.CreateComment(ctx, input)
 	if err != nil {
 		return nil, err
@@ -117,103 +59,28 @@ func (r *postResolver) CreatedAt(ctx context.Context, obj *models.Post) (*models
 }
 
 // Comments is the resolver for the comments field.
-func (r *postResolver) Comments(ctx context.Context, obj *models.Post, limit *int32, offset *int32, level *int32) ([]*models.Comment, error) {
-	//var comments []*models.Comment
-	//
-	//query := `
-	//	SELECT comment_id, post_id, reply_comment_id, comment_level, person_id, content, created_at
-	//	FROM comment
-	//	WHERE post_id = $1
-	//	AND (comment_level <= $2)
-	//	ORDER BY created_at ASC
-	//`
-	//
-	//err := r.DB.SelectContext(ctx, &comments, query, obj.ID, *level)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//ordered := flattenCommentsAsTree(comments)
-	//
-	//var l int32 = int32(len(ordered))
-	//var o int32 = 0
-	//
-	//if limit != nil {
-	//	l = *limit
-	//}
-	//if offset != nil {
-	//	o = *offset
-	//}
-	//
-	//if o > int32(len(ordered)) {
-	//	return []*models.Comment{}, nil
-	//}
-	//
-	//end := o + l
-	//if end > int32(len(ordered)) {
-	//	end = int32(len(ordered))
-	//}
-	//
-	//return ordered[o:end], nil
-
+func (r *postResolver) Comments(
+	ctx context.Context,
+	obj *models.Post,
+	limit *int32,
+	offset *int32,
+	level *int32,
+) ([]*models.Comment, error) {
 	comments, err := r.Store.GetCommentsByPostID(ctx, obj.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	ordered := flattenCommentsAsTree(comments)
-
-	if level != nil {
-		filtered := make([]*models.Comment, 0, len(ordered))
-		for _, c := range ordered {
-			if int32(c.CommentLevel) <= *level {
-				filtered = append(filtered, c)
-			}
-		}
-		ordered = filtered
-	}
-
-	var l int32 = int32(len(ordered))
-	var o int32 = 0
-
-	if limit != nil {
-		l = *limit
-	}
-	if offset != nil {
-		o = *offset
-	}
-
-	if o >= int32(len(ordered)) {
-		return []*models.Comment{}, nil
-	}
-
-	end := o + l
-	if end > int32(len(ordered)) {
-		end = int32(len(ordered))
-	}
-
-	return ordered[o:end], nil
+	return flattenCommentsAsTree(comments, limit, offset, level), nil
 }
 
 // Posts is the resolver for the posts field.
 func (r *queryResolver) Posts(ctx context.Context) ([]*models.Post, error) {
-	//var posts []*models.Post
-	//
-	//query := `SELECT post_id, person_id, content, allow_comment, created_at FROM post;`
-	//err := r.DB.Select(&posts, query)
-	//
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//return posts, nil
 	return r.Store.GetPosts(ctx)
-
 }
 
 // Post is the resolver for the post field.
 func (r *queryResolver) Post(ctx context.Context, id int) (*models.Post, error) {
-	//return r.GetPostByID(ctx, id)
 	return r.Store.GetPostByID(ctx, id)
 }
 
